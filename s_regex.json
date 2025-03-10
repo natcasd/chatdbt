@@ -1,0 +1,24 @@
+{
+    "patterns": [
+        "<diagnostic_test><patient><misinterpretation>",
+        "<patient><transfusion><transfusion_reaction>",
+        "<patient><chemotherapy><toxicity>",
+        "<radiation_therapy><patient><radiation_burn>",
+        "<medication><patient><ineffectiveness>",
+        "<patient><opioid><withdrawal_symptoms>",
+        "<vaccine><patient><autoimmune_response>",
+        "<drug><patient><organ_damage>",
+        "<imaging_test><patient><contrast_reaction>",
+        "<patient><surgical_procedure><failed_healing>",
+        "<medication><patient><severe_drowsiness>",
+        "<patient><implant><infection>",
+        "<transfusion><patient><hemolytic_reaction>",
+        "<medical_device><patient><malfunction>",
+        "<treatment><patient><unexpected_outcome>",
+        "<patient><sedative><paradoxical_reaction>",
+        "<surgery><patient><excessive_bleeding>",
+        "<patient><immunotherapy><hyperreaction>",
+        "<anesthesia><patient><prolonged_recovery>",
+        "<patient><experimental_drug><unknown_effect>"
+    ]
+} 
