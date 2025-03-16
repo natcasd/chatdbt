@@ -136,9 +136,9 @@ class AnthropicClient:
             return f"Error: {str(e)}"
 
 
-class GrokClient:
+class GroqClient:
     """
-    Class for interacting with xAI's Grok language models via Groq's API.
+    Class for interacting with Groq's language model APIs.
     """
     def __init__(
         self, 
@@ -146,7 +146,7 @@ class GrokClient:
         temperature: float = 0.7
     ):
         """
-        Initialize a Grok LLM client using Groq's API.
+        Initialize a Groq client for fast hosted LLM inference. Can query a variety of open source models for free.
         
         Args:
             model: The specific model to use (default: llama3-8b-8192)
