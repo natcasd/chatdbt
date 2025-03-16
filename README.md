@@ -14,7 +14,7 @@ git clone https://github.com/natcasd/chatdbt.git
 ```
 2. Set up your environment:
    - Copy `.env.example` to `.env`
-   - Add your OpenAI API key to `.env`
+   - Add your API keys to `.env`
 
 ## Team Members
 
