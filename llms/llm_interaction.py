@@ -135,3 +135,62 @@ class AnthropicClient:
             print(f"Error generating text with Claude: {str(e)}")
             return f"Error: {str(e)}"
 
+
+class GrokClient:
+    """
+    Class for interacting with xAI's Grok language models via Groq's API.
+    """
+    def __init__(
+        self, 
+        model: str = "llama3-8b-8192", 
+        temperature: float = 0.7
+    ):
+        """
+        Initialize a Grok LLM client using Groq's API.
+        
+        Args:
+            model: The specific model to use (default: llama3-8b-8192)
+            temperature: Temperature for generation (higher = more creative)
+        """
+        self.model = model
+        self.temperature = temperature
+        
+        # Get API key from environment
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not found in environment variables")
+        
+        # Initialize Groq client
+        try:
+            from groq import Groq
+            self.client = Groq(api_key=api_key)
+            print(f"Groq client initialized with model: {model}")
+        except ImportError:
+            raise ImportError("Groq package not installed. Run 'pip install groq' to use Groq-hosted models.")
+    
+    def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
+        """
+        Generate text using Groq API.
+        
+        Args:
+            prompt: The input prompt
+            max_tokens: Maximum number of tokens to generate
+            **kwargs: Additional parameters to pass to the API
+            
+        Returns:
+            Generated text response
+        """
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+                max_tokens=max_tokens,
+                **kwargs
+            )
+            return response.choices[0].message.content.strip()
+                
+        except Exception as e:
+            print(f"Error generating text with Groq: {str(e)}")
+            return f"Error: {str(e)}"
+
