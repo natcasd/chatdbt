@@ -6,7 +6,7 @@ def load_s_regexes(json_file):
     with open(json_file, 'r') as file:
         return json.load(file).get('patterns', [])
 
-def main2(output_file):
+def main(output_file):
     llm = OpenAIClient(model="gpt-4o", temperature=0.7)
     
     s_regexes = load_s_regexes('s_regex.json')
@@ -30,4 +30,4 @@ def main2(output_file):
 
 
 if __name__ == "__main__":
-    main2('datasets/patient_records2.json')
+    main('datasets/patient_records2.json')
