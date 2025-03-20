@@ -1,12 +1,36 @@
 from llms.llm_interaction import GroqClient
 import json
 import ast
+import re
 
+from transitions import Machine
 
+class PatternFSM:
+    def __init__(self, pattern):
+        self.pattern = pattern
+        self.states = ["START", "MATCHING", "ACCEPTED", "REJECTED"]
+        self.machine = Machine(model=self, states=self.states, initial="START")
+
+        # Define transitions
+        self.machine.add_transition(trigger="start_matching", source="START", dest="MATCHING")
+        self.machine.add_transition(trigger="accept", source="MATCHING", dest="ACCEPTED")
+        self.machine.add_transition(trigger="reject", source="MATCHING", dest="REJECTED")
+
+    def match(self, symbols):
+        """Simulate FSM processing extracted symbols."""
+        self.start_matching()
+        input_string = ' '.join(symbols.values())
+        
+        if self.pattern.fullmatch(input_string):  # Using regex internally
+            self.accept()
+            print("Pattern Matched!")
+        else:
+            self.reject()
+            print("Pattern Not Matched!")
 def pattern_identification(symbols, regex):
-    # FSM implementation
-    pass
-
+    fsm = PatternFSM(re.compile(regex))
+    fsm.match(symbols)
+    
 def main():
     with open('datasets/patient_records1.json', 'r') as file:
         records = json.load(file)
