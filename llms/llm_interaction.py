@@ -22,6 +22,7 @@ class OpenAIClient:
         """
         self.model = model
         self.temperature = temperature
+        self.provider = "openai"
         
         # Get API key from environment
         api_key = os.getenv("OPENAI_API_KEY")
@@ -73,13 +74,14 @@ class OpenAIClient:
             print(f"Error listing OpenAI models: {str(e)}")
             print("\n")
     
-    def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
+    def generate(self, prompt: str, max_tokens: int = 500, system_prompt: str = None, **kwargs) -> str:
         """
         Generate text using OpenAI's API.
         
         Args:
             prompt: The input prompt
             max_tokens: Maximum number of tokens to generate
+            system_prompt: Optional system prompt to guide the model's behavior
             **kwargs: Additional parameters to pass to the API
             
         Returns:
@@ -88,9 +90,14 @@ class OpenAIClient:
         try:
             # For chat models
             if self.model.startswith(("gpt-3.5", "gpt-4")):
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                
                 response = self.client.chat.completions.create(
                     model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=messages,
                     temperature=self.temperature,
                     max_tokens=max_tokens,
                     **kwargs
@@ -131,7 +138,7 @@ class AnthropicClient:
         """
         self.model = model
         self.temperature = temperature
-        
+        self.provider = "anthropic"
         # Get API key from environment
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
@@ -171,13 +178,14 @@ class AnthropicClient:
             print(f"Error listing Anthropic models: {str(e)}")
             print("\n")
     
-    def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
+    def generate(self, prompt: str, max_tokens: int = 500, system_prompt: str = None, **kwargs) -> str:
         """
         Generate text using Claude API.
         
         Args:
             prompt: The input prompt
             max_tokens: Maximum number of tokens to generate
+            system_prompt: Optional system prompt to guide the model's behavior
             **kwargs: Additional parameters to pass to the API
             
         Returns:
@@ -185,9 +193,14 @@ class AnthropicClient:
         """
         try:
             # Using the messages API (anthropic >= 0.5.0)
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
             response = self.client.messages.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=self.temperature,
                 max_tokens=max_tokens,
                 **kwargs
@@ -217,7 +230,7 @@ class GroqClient:
         """
         self.model = model
         self.temperature = temperature
-        
+        self.provider = "groq"
         # Get API key from environment
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
@@ -255,22 +268,28 @@ class GroqClient:
             print(f"Error listing Groq models: {str(e)}")
             print("\n")
     
-    def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
+    def generate(self, prompt: str, max_tokens: int = 500, system_prompt: str = None, **kwargs) -> str:
         """
         Generate text using Groq API.
         
         Args:
             prompt: The input prompt
             max_tokens: Maximum number of tokens to generate
+            system_prompt: Optional system prompt to guide the model's behavior
             **kwargs: Additional parameters to pass to the API
             
         Returns:
             Generated text response
         """
         try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=self.temperature,
                 max_tokens=max_tokens,
                 **kwargs

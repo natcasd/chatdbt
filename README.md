@@ -16,6 +16,12 @@ git clone https://github.com/natcasd/chatdbt.git
    - Copy `.env.example` to `.env`
    - Add your API keys to `.env`
 
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+4. Sample code to run approaches is in test_approaches.ipynb
+
 ## Team Members
 
 By Nathan, Justin, Yandi, Noah
