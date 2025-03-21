@@ -36,6 +36,43 @@ class OpenAIClient:
         except ImportError:
             raise ImportError("OpenAI package not installed. Run 'pip install openai' to use OpenAI models.")
     
+    def list_models(self):
+        """
+        Fetch and display all available models from OpenAI API.
+        """
+        try:
+            models = self.client.models.list()
+            openai_models = [model.id for model in models.data]
+            
+            # Group models by category for easier readability
+            gpt4_models = [model for model in openai_models if model.startswith("gpt-4")]
+            gpt35_models = [model for model in openai_models if model.startswith("gpt-3.5")]
+            other_models = [model for model in openai_models if not (model.startswith("gpt-4") or model.startswith("gpt-3.5"))]
+            
+            print("\n" + "="*50)
+            print(f"AVAILABLE OPENAI MODELS ({len(openai_models)} total)")
+            print("="*50)
+            
+            if gpt4_models:
+                print("\nGPT-4 Models:")
+                for model in sorted(gpt4_models):
+                    print(f"  - {model}")
+            
+            if gpt35_models:
+                print("\nGPT-3.5 Models:")
+                for model in sorted(gpt35_models):
+                    print(f"  - {model}")
+                    
+            if other_models:
+                print("\nOther Models:")
+                for model in sorted(other_models):
+                    print(f"  - {model}")
+            
+            print("\n")
+        except Exception as e:
+            print(f"Error listing OpenAI models: {str(e)}")
+            print("\n")
+    
     def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
         """
         Generate text using OpenAI's API.
@@ -108,6 +145,32 @@ class AnthropicClient:
         except ImportError:
             raise ImportError("Anthropic package not installed. Run 'pip install anthropic' to use Claude models.")
     
+    def list_models(self):
+        """
+        Fetch and display all available models from Anthropic API.
+        """
+        try:
+            # Use the actual Anthropic API to list models
+            models_response = self.client.models.list()
+            models = models_response.data
+            model_ids = [model.id for model in models]
+            
+            print("\n" + "="*50)
+            print(f"AVAILABLE ANTHROPIC MODELS ({len(model_ids)} total)")
+            print("="*50)
+            
+            print("\nClaude Models:")
+            for model in models:
+                current = " (currently selected)" if model.id == self.model else ""
+                print(f"  - {model.id}{current}")
+                if hasattr(model, 'display_name') and model.display_name:
+                    print(f"    Display Name: {model.display_name}")
+            
+            print("\n")
+        except Exception as e:
+            print(f"Error listing Anthropic models: {str(e)}")
+            print("\n")
+    
     def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
         """
         Generate text using Claude API.
@@ -167,6 +230,30 @@ class GroqClient:
             print(f"Groq client initialized with model: {model}")
         except ImportError:
             raise ImportError("Groq package not installed. Run 'pip install groq' to use Groq-hosted models.")
+    
+    def list_models(self):
+        """
+        Fetch and display all available models from Groq API.
+        """
+        try:
+            models = self.client.models.list()
+            model_ids = [model.id for model in models.data]
+            
+            print("\n" + "="*50)
+            print(f"AVAILABLE GROQ MODELS ({len(model_ids)} total)")
+            print("="*50)
+            
+            print("\nGroq-hosted Models:")
+            for model in models.data:
+                current = " (currently selected)" if model.id == self.model else ""
+                print(f"  - {model.id}{current}")
+                if hasattr(model, 'description') and model.description:
+                    print(f"    Description: {model.description}")
+            
+            print("\n")
+        except Exception as e:
+            print(f"Error listing Groq models: {str(e)}")
+            print("\n")
     
     def generate(self, prompt: str, max_tokens: int = 500, **kwargs) -> str:
         """
