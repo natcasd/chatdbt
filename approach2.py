@@ -5,6 +5,7 @@ import time
 from run_logger import log_run_results
 from metrics.metrics import accuracy, precision, recall, f1_score 
 from transitions import Machine
+import openai
 
 class PatternFSM:
     def __init__(self, pattern):
@@ -17,32 +18,51 @@ class PatternFSM:
         self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
         self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
 
-    def match(self, record_text):
-        # Move to extracting state
-        self.start_extraction()  
+    def match(self, record_text, semantic_symbols):
+        """ Checks if all required semantic symbols are found in the given text. """
+        self.start_extraction() 
 
-        # Extract text values
-        extracted_symbols = self.extract_symbols(record_text)  
+        found_all = self.extract_symbols(record_text, semantic_symbols)
 
-        if extracted_symbols:
-            # If we found all required symbols, accept
+        if found_all:
             self.accept()  
-            print("Extracted Symbols:", extracted_symbols)
-            return extracted_symbols
+            print("All required symbols found.")
+            return True
         else:
-            # If symbols are missing, reject
             self.reject()  
-            # print("No valid symbols found.")
-            return None
-    def extract_symbols(self, record_text):
-        return None
+            print("Some required symbols are missing.")
+            return False
+    def extract_symbols(self, record_text, semantic_symbols):
+        openai.api_key = "YOUR_OPENAI_API_KEY"
+        prompt = f"""
+        Identify which of the following semantic symbols appear in the given text.
+        Only return the semantic symbols that are present as a JSON list.
+
+        Semantic symbols: {semantic_symbols}
+        
+        Text: "{record_text}"
+
+        Example response format:
+        ["<drug>", "<disease>"]
+        """
+        response = openai.ChatCompletion.create(
+        model="gpt-4",  
+        messages=[
+                {"role": "system", "content": "You are an expert entity extractor."},
+                {"role": "user", "content": prompt}
+            ],
+        max_tokens=100,  
+        temperature=0.0
+        )
+        extracted_symbols = json.loads(response["choices"][0]["message"]["content"].strip())
+        return set(semantic_symbols).issubset(set(extracted_symbols))
 
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
 def pattern_identification(symbols, regex):
     fsm = PatternFSM(re.compile(regex))
-    fsm.match(symbols)
-    return False
+    return fsm.match(symbols)
+    
 
 def parse_model_output(model_output):
     """
