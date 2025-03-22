@@ -60,7 +60,7 @@ class PatternFSM:
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
 def pattern_identification(symbols, regex):
-    fsm = PatternFSM(re.compile(regex))
+    fsm = PatternFSM(regex)
     return fsm.match(symbols)
     
 
