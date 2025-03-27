@@ -19,11 +19,11 @@ class PatternFSM:
         self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
         self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
 
-    def match(self, record_text, semantic_symbols):
+    def match(self, extracted_symbols, semantic_symbols):
         """ Checks if all required semantic symbols are found in the given text. """
         self.start_extraction() 
 
-        found_all = self.extract_symbols(record_text, semantic_symbols)
+        found_all = set(semantic_symbols).issubset(set(extracted_symbols))
 
         if found_all:
             self.accept()  
@@ -33,25 +33,25 @@ class PatternFSM:
             self.reject()  
             print("Some required symbols are missing.")
             return False
-    def extract_symbols(self, record_text, semantic_symbols):
-        found_symbols = set()
+    # def extract_symbols(self, record_text, semantic_symbols):
+    #     found_symbols = set()
 
-        for symbol in semantic_symbols:
-            pattern = re.escape(symbol)  
-            match = re.search(pattern, record_text, re.IGNORECASE)
+    #     for symbol in semantic_symbols:
+    #         pattern = re.escape(symbol)  
+    #         match = re.search(pattern, record_text, re.IGNORECASE)
             
-            if match:
-                found_symbols.add(symbol)
-                self.found_symbol()  
+    #         if match:
+    #             found_symbols.add(symbol)
+    #             self.found_symbol()  
         
-        return set(semantic_symbols).issubset(found_symbols)
+    #     return set(semantic_symbols).issubset(found_symbols)
 
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
 def pattern_identification(response_dict, regex):
     fsm = PatternFSM(regex)
     extracted_symbols = list(response_dict.keys())
-    return fsm.match("", extracted_symbols)
+    return fsm.match(extracted_symbols, regex)
 
 def parse_model_output(model_output):
     """
