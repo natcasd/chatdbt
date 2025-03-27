@@ -15,6 +15,7 @@ class PatternFSM:
 
         # Define transitions
         self.machine.add_transition(trigger="start_extraction", source="START", dest="EXTRACTING")
+        self.machine.add_transition(trigger="found_symbol", source="EXTRACTING", dest="EXTRACTING")
         self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
         self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
 
@@ -33,36 +34,24 @@ class PatternFSM:
             print("Some required symbols are missing.")
             return False
     def extract_symbols(self, record_text, semantic_symbols):
-        openai.api_key = "YOUR_OPENAI_API_KEY"
-        prompt = f"""
-        Identify which of the following semantic symbols appear in the given text.
-        Only return the semantic symbols that are present as a JSON list.
+        found_symbols = set()
 
-        Semantic symbols: {semantic_symbols}
+        for symbol in semantic_symbols:
+            pattern = re.escape(symbol)  
+            match = re.search(pattern, record_text, re.IGNORECASE)
+            
+            if match:
+                found_symbols.add(symbol)
+                self.found_symbol()  
         
-        Text: "{record_text}"
-
-        Example response format:
-        ["<drug>", "<disease>"]
-        """
-        response = openai.ChatCompletion.create(
-        model="gpt-4",  
-        messages=[
-                {"role": "system", "content": "You are an expert entity extractor."},
-                {"role": "user", "content": prompt}
-            ],
-        max_tokens=100,  
-        temperature=0.0
-        )
-        extracted_symbols = json.loads(response["choices"][0]["message"]["content"].strip())
-        return set(semantic_symbols).issubset(set(extracted_symbols))
+        return set(semantic_symbols).issubset(found_symbols)
 
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
-def pattern_identification(symbols, regex):
+def pattern_identification(response_dict, regex):
     fsm = PatternFSM(regex)
-    return fsm.match(symbols)
-    
+    extracted_symbols = list(response_dict.keys())
+    return fsm.match("", extracted_symbols)
 
 def parse_model_output(model_output):
     """
