@@ -25,7 +25,6 @@ class OpenAIClient:
         self.provider = "openai"
         
         # Get API key from environment
-        #API Key
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -300,4 +299,3 @@ class GroqClient:
         except Exception as e:
             print(f"Error generating text with Groq: {str(e)}")
             return f"Error: {str(e)}"
-

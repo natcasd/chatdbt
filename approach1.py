@@ -3,7 +3,7 @@ from run_logger import log_run_results
 import time
 from tqdm import tqdm
 
-def approach1(records, model_client, dataset_name="not defined", log_results=False, prompt_template=None, system_prompt=None):
+def approach1(records, model_client, dataset_name="not defined", log_results=False, prompt_template=None, system_prompt=None, verbose=False):
     pred = []
     true = []
     
@@ -12,7 +12,14 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
     if system_prompt is None:
         system_prompt = "You are a helpful AI assistant that strictly answers True or False based on patient data and provided semantic regex matching."
 
-    for record in tqdm(records, desc="Processing records", unit="record"):
+    # Use tqdm only when not in verbose mode
+    if verbose:
+        record_iterator = records
+        print(f"Processing {len(records)} records...")
+    else:
+        record_iterator = tqdm(records, desc="Processing records", unit="record")
+
+    for record in record_iterator:
         regex = record['s_regex']
         record_text = record['record']
         label  = record['match']
@@ -26,6 +33,13 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
         response_bool = response.strip().lower() == "true"
         pred.append(response_bool)
         true.append(label)
+        
+        if verbose:
+            print("\n" + "="*80)
+            print(f"\nPatient Record: {record_text}")
+            print(f"Semantic Regex: {regex}")
+            print(f"Model prediction: {response_bool}, Actual: {label}")
+            print("=" * 80)
 
     end_time = time.time()
 
