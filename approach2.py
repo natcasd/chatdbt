@@ -5,7 +5,6 @@ import time
 from run_logger import log_run_results
 from metrics.metrics import accuracy, precision, recall, f1_score 
 from transitions import Machine
-import openai
 
 class PatternFSM:
     def __init__(self, pattern):
@@ -19,19 +18,28 @@ class PatternFSM:
         self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
         self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
 
-    def match(self, extracted_symbols, semantic_symbols):
+    def match(self, extracted_symbols, semantic_symbols, verbose=False):
         """ Checks if all required semantic symbols are found in the given text. """
         self.start_extraction() 
 
-        found_all = set(semantic_symbols).issubset(set(extracted_symbols))
+        # Extract semantic symbols from the pattern string (e.g., "<sym1><sym2>")
+        required_symbols = re.findall(r"<(.*?)>", semantic_symbols)
+
+        found_all = set(required_symbols).issubset(set(extracted_symbols))
 
         if found_all:
-            self.accept()  
-            print("All required symbols found.")
+            self.accept()
+            if verbose:
+                print("FSM Result: All required symbols found.")
+            
             return True
         else:
-            self.reject()  
-            print("Some required symbols are missing.")
+            self.reject()
+            missing = set(semantic_symbols) - set(extracted_symbols)
+
+            if verbose:
+                print(f"FSM Result: Some required symbols are missing: {missing}")
+           
             return False
     # def extract_symbols(self, record_text, semantic_symbols):
     #     found_symbols = set()
@@ -48,10 +56,10 @@ class PatternFSM:
 
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
-def pattern_identification(response_dict, regex):
+def pattern_identification(response_dict, regex, verbose=False):
     fsm = PatternFSM(regex)
     extracted_symbols = list(response_dict.keys())
-    return fsm.match(extracted_symbols, regex)
+    return fsm.match(extracted_symbols, regex, verbose)
 
 def parse_model_output(model_output):
     """
@@ -78,7 +86,7 @@ def parse_model_output(model_output):
         response_dict = {}
     return response_dict
 
-def approach2(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None):
+def approach2(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False):
     pred = []
     true = []
 
@@ -87,22 +95,47 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
     if system_prompt is None:
         system_prompt = "You are a helpful AI assistant that strictly outputs a python dictionary with <symbol>: extracted text pairs, that can be parsed with ast.literal_eval()."
 
-    for record in tqdm(records, desc="Processing records", unit="record"):
+    # Use tqdm only when not in verbose mode
+    if verbose:
+        record_iterator = records
+        print(f"Processing {len(records)} records...")
+
+    else:
+        record_iterator = tqdm(records, desc="Processing records", unit="record")
+
+    for record in record_iterator:
+
         regex = record['s_regex']
         record_text = record['record']
-        label  = record['match']
+        label = record['match']
+ 
+        if verbose:
+            print("\n" + "="*80)
+            print(f"Patient Record:\n{record_text}\n", flush=True)
+            print(f"Semantic Regex: {regex}")
+
+
         if extraction_prompt_template:
             prompt = extraction_prompt_template.format(regex=regex, record_text=record_text)
         else:
             prompt = f"Given the following patient record, extract the following semantic symbols if they exist: {regex}. Return a machine parseable dictionary with <symbol>: extracted text pairs. IMPORTANT: Only return the dictionary, nothing else.\n\nPatient Record: {record_text}"
-            
+        
         response = model_client.generate(prompt, system_prompt=system_prompt)
-        # this doesn't work unless llm returns exactly the dictionary - perhaps some parsing logic would be better
         response_dict = parse_model_output(response)
 
-        response_bool = pattern_identification(response_dict, regex)
+        
+        if verbose:
+            print(f"\nExtracted Symbols Dictionary:")
+            for symbol, text in response_dict.items():
+                print(f"  - {symbol}: {text}")
+        
+        response_bool = pattern_identification(response_dict, regex, verbose)
         pred.append(response_bool)
         true.append(label)
+        
+        if verbose:
+            print(f"Model prediction: {response_bool}, Actual: {label}")
+            print("="*80)
 
     end_time = time.time()
 
