@@ -1,5 +1,7 @@
 # Environment variables
 .env
 .venv
+2270env/
+node_modules/
 
 __pycache__/
