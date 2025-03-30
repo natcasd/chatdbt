@@ -36,7 +36,6 @@ class PatternFSM:
         else:
             self.reject()
             missing = set(semantic_symbols) - set(extracted_symbols)
-
             if verbose:
                 print(f"FSM Result: Some required symbols are missing: {missing}")
            
@@ -99,22 +98,19 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
     if verbose:
         record_iterator = records
         print(f"Processing {len(records)} records...")
-
     else:
         record_iterator = tqdm(records, desc="Processing records", unit="record")
 
     for record in record_iterator:
-
         regex = record['s_regex']
         record_text = record['record']
         label = record['match']
- 
+        
         if verbose:
             print("\n" + "="*80)
-            print(f"Patient Record:\n{record_text}\n", flush=True)
+            print(f"Patient Record:\n{record_text}\n")
             print(f"Semantic Regex: {regex}")
-
-
+            
         if extraction_prompt_template:
             prompt = extraction_prompt_template.format(regex=regex, record_text=record_text)
         else:
@@ -122,7 +118,6 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
         
         response = model_client.generate(prompt, system_prompt=system_prompt)
         response_dict = parse_model_output(response)
-
         
         if verbose:
             print(f"\nExtracted Symbols Dictionary:")
