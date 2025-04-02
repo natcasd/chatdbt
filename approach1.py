@@ -56,6 +56,8 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
     results = {
         'approach': 'Approach 1',
         'dataset': dataset_name,
+        'pred': pred,
+        'true': true,
         'accuracy': acc,
         'precision': prec,
         'recall': rec,
@@ -66,7 +68,7 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
     }
     if log_results:
         log_run_results(results)
-    return pred, true
+    return results
 
 def approach1_naive(records, model_client, dataset_name="not defined", log_results=False, prompt_template=None, system_prompt=None, verbose=False):
     pred = []
@@ -121,6 +123,8 @@ def approach1_naive(records, model_client, dataset_name="not defined", log_resul
     results = {
         'approach': 'Approach 1 Naive',
         'dataset': dataset_name,
+        'pred': pred,
+        'true': true,
         'accuracy': acc,
         'precision': prec,
         'recall': rec,

@@ -114,7 +114,7 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
         if extraction_prompt_template:
             prompt = extraction_prompt_template.format(regex=regex, record_text=record_text)
         else:
-            prompt = f"Given the following patient record, extract the following semantic symbols if they exist: {regex}. Return a machine parseable dictionary with <symbol>: extracted text pairs. IMPORTANT: Only return the dictionary, nothing else.\n\nPatient Record: {record_text}"
+            prompt = f"Given the following patient record, extract the following semantic symbols if they exist: {regex}. Return a machine parseable dictionary with <symbol>: extracted text pairs. IMPORTANT: Only return the dictionary, nothing else. If a symbol is not found, do not include it in the dictionary.\n\nPatient Record: {record_text}"
         
         response = model_client.generate(prompt, system_prompt=system_prompt)
         response_dict = parse_model_output(response)
@@ -147,6 +147,8 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
     results = {
         'approach': 'Approach 2',
         'dataset': dataset_name,
+        'pred': pred,
+        'true': true,
         'accuracy': acc,
         'precision': prec,
         'recall': rec,
