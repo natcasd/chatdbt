@@ -1,5 +1,5 @@
 from metrics.metrics import accuracy, precision, recall, f1_score
-from run_logger import log_run_results
+from results.run_logger import log_run_results
 import time
 from tqdm import tqdm
 
