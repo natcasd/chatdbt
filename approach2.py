@@ -35,7 +35,7 @@ class PatternFSM:
             return True
         else:
             self.reject()
-            missing = set(semantic_symbols) - set(extracted_symbols)
+            missing = set(required_symbols) - set(extracted_symbols)
             if verbose:
                 print(f"FSM Result: Some required symbols are missing: {missing}")
            
@@ -55,35 +55,37 @@ class PatternFSM:
 
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
-def pattern_identification(response_dict, regex, verbose=False):
+def pattern_identification(extracted_symbols, regex, verbose=False):
     fsm = PatternFSM(regex)
-    extracted_symbols = list(response_dict.keys())
-    return fsm.match(extracted_symbols, regex, verbose)
+    # Extract just the symbols from the tuples for pattern matching
+    symbols_only = [symbol for symbol, _ in extracted_symbols]
+    return fsm.match(symbols_only, regex, verbose)
 
 def parse_model_output(model_output):
     """
-    This function takes a model output string and attempts to extract a dictionary from it if it exists.
+    This function takes a model output string and attempts to extract a list of tuples from it if it exists.
+    Each tuple should be (symbol, explanation) where symbol is the semantic symbol and explanation is where it appears.
     
     Args:
-        model_output (str): The output string from the model which may contain a dictionary.
+        model_output (str): The output string from the model which may contain a list of tuples.
         
     Returns:
-        dict: A dictionary extracted from the model output if it exists, otherwise an empty dictionary.
+        list: A list of tuples extracted from the model output if it exists, otherwise an empty list.
     """
     try:
-        # Try to find dictionary pattern using regex
+        # Try to find list pattern using regex
         import re
-        dict_match = re.search(r'\{.*\}', model_output, re.DOTALL)
-        if dict_match:
-            dict_str = dict_match.group(0)
-            response_dict = ast.literal_eval(dict_str)
+        list_match = re.search(r'\[.*\]', model_output, re.DOTALL)
+        if list_match:
+            list_str = list_match.group(0)
+            response_list = ast.literal_eval(list_str)
         else:
-            # Fallback to original response if no dictionary pattern found
-            response_dict = ast.literal_eval(model_output)
+            # Fallback to original response if no list pattern found
+            response_list = ast.literal_eval(model_output)
     except:
-        print(f"Failed to parse response as dictionary: {model_output}")
-        response_dict = {}
-    return response_dict
+        print(f"Failed to parse response as list of tuples: {model_output}")
+        response_list = []
+    return response_list
 
 def approach2(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False):
     pred = []
@@ -92,8 +94,11 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
     start_time = time.time()
 
     if system_prompt is None:
-        system_prompt = "You are a helpful AI assistant that strictly outputs a python dictionary with <symbol>: extracted text pairs, that can be parsed with ast.literal_eval()."
 
+        system_prompt = """
+        You are a helpful AI assistant that strictly outputs a python list of tuples, where each tuple is (<semantic_symbol>, explanation) in the order they appear in the patient record.
+        The output should be parseable with ast.literal_eval().
+        """
     # Use tqdm only when not in verbose mode
     if verbose:
         record_iterator = records
@@ -114,17 +119,24 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
         if extraction_prompt_template:
             prompt = extraction_prompt_template.format(regex=regex, record_text=record_text)
         else:
-            prompt = f"Given the following patient record, extract the following semantic symbols if they exist: {regex}. Return a machine parseable dictionary with <symbol>: extracted text pairs. IMPORTANT: Only return the dictionary, nothing else. If a symbol is not found, do not include it in the dictionary.\n\nPatient Record: {record_text}"
+            prompt = """
+            Given the following patient record, extract the following semantic symbols if they exist: {regex}. 
+            Return a machine parseable python list of tuples, where each tuple is (<semantic_symbol>, explanation) in the order they appear in the patient record. 
+            IMPORTANT: Only return the list, nothing else. If a semantic symbol is not clearly represented in the patient record, do not include it in the list.
+            Make sure the order of the list reflects the order in which the semantic symbols appear in the patient record, not the order in which they are listed in the regex.
+            The explanation should be a brief description of where/how the symbol appears in the text.
+            \n\nPatient Record: {record_text}
+            """
         
         response = model_client.generate(prompt, system_prompt=system_prompt)
-        response_dict = parse_model_output(response)
+        extracted_symbols = parse_model_output(response)
         
         if verbose:
-            print(f"\nExtracted Symbols Dictionary:")
-            for symbol, text in response_dict.items():
-                print(f"  - {symbol}: {text}")
+            print(f"\nExtracted Symbols List:")
+            for symbol, explanation in extracted_symbols:
+                print(f"  - {symbol}: {explanation}")
         
-        response_bool = pattern_identification(response_dict, regex, verbose)
+        response_bool = pattern_identification(extracted_symbols, regex, verbose)
         pred.append(response_bool)
         true.append(label)
         
