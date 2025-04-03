@@ -190,6 +190,26 @@ def generate_dataset_2(output_file):
         json.dump(records, file, indent=2)
     print(f"Dataset generation complete. Saved {len(records)} records to {output_file}")
 
+def generate_nl_query(input_filepath, output_filepath):
+    """
+    Generate a natural language query for each semantic regex pattern in a pre-generated dataset. Save to new file specified in argument.
+    """
+    with open(input_filepath, 'r') as f:
+        old_data = json.load(f)
+    llm = GroqClient(model="llama-3.3-70b-versatile")
+    for record in old_data:
+        s_regex = record['s_regex']
+        prompt = f"""
+        Generate a natural language query for the following semantic regex pattern:
+        {s_regex}
+        For example, if the semantic regex pattern is "<diagnostic_test><patient><misinterpretation>", the natural language query could be "Is there an occurence of the patient having a misinterpretation of their diagnostic test results?"
+        Important: Only return the natural language query, nothing else.
+        """
+        nl_query = llm.generate(prompt=prompt, max_tokens=100)
+        print(nl_query)
+        record['nl_query'] = nl_query
+    with open(output_filepath, 'w') as f:
+        json.dump(old_data, f, indent=2)
 
 
 if __name__ == "__main__":
@@ -197,4 +217,5 @@ if __name__ == "__main__":
     # test_generations()
     # test_negative_generations()
     # testing_for_variability()
-    generate_dataset_2('datasets/patient_records2.json')
+    # generate_dataset_2('datasets/patient_records2.json')
+    generate_nl_query('patient_records2.json', 'patient_records2_nl_query.json')

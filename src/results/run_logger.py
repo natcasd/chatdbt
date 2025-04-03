@@ -10,6 +10,8 @@ def log_run_results(results, log_file="results/experiment_results.csv"):
         results (dict): Dictionary containing run results with the following keys:
             - time_elapsed (float): Time taken for the run in seconds
             - dataset (str): Dataset used for the run
+            - pred (list): Predicted values
+            - true (list): True values
             - provider (str): Provider used (OpenAI, Anthropic, Groq, etc.)
             - model (str): Model used
             - approach (str): Approach or method used
@@ -23,7 +25,7 @@ def log_run_results(results, log_file="results/experiment_results.csv"):
     results['date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # Define the fields to be stored in the CSV
-    fields = ['approach', 'dataset', 'accuracy', 'precision', 'recall', 'f1', 'time_elapsed', 'date', 'model', 'provider' ]
+    fields = ['approach', 'dataset', 'pred', 'true', 'accuracy', 'precision', 'recall', 'f1', 'time_elapsed', 'date', 'model', 'provider' ]
     
     # Check if file exists to determine if headers need to be written
     file_exists = os.path.isfile(log_file)

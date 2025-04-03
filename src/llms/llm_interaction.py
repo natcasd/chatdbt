@@ -299,4 +299,3 @@ class GroqClient:
         except Exception as e:
             print(f"Error generating text with Groq: {str(e)}")
             return f"Error: {str(e)}"
-

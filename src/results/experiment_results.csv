@@ -1,0 +1,7 @@
+approach,dataset,pred,true,accuracy,precision,recall,f1,time_elapsed,date,model,provider
+Approach 2,not defined,"[True, False, True, False, True, False, True, True, True, True]","[True, False, True, False, True, False, True, False, True, False]",0.8,0.7142857142857143,1.0,0.8333333333333333,43.59153985977173,2025-04-02 13:08:41,llama-3.3-70b-versatile,groq
+Approach 2,not defined,"[False, False]","[True, False]",0.5,0.0,0.0,0.0,2.33036732673645,2025-04-02 19:50:18,llama-3.3-70b-versatile,groq
+Approach 2,not defined,"[False, False]","[True, False]",0.5,0.0,0.0,0.0,2.178318738937378,2025-04-02 19:55:37,llama-3.3-70b-versatile,groq
+Approach 2,not defined,"[False, False]","[True, False]",0.5,0.0,0.0,0.0,2.925530195236206,2025-04-02 20:06:04,llama-3.3-70b-versatile,groq
+Approach 2,not defined,"[False, False]","[True, False]",0.5,0.0,0.0,0.0,2.206676959991455,2025-04-02 20:17:23,llama-3.3-70b-versatile,groq
+Approach 2,not defined,"[False, False]","[True, False]",0.5,0.0,0.0,0.0,1.8584420680999756,2025-04-02 20:18:45,llama-3.3-70b-versatile,groq
