@@ -135,4 +135,4 @@ def approach1_naive(records, model_client, dataset_name="not defined", log_resul
     }
     if log_results:
         log_run_results(results)
-    return pred, true
+    return results

@@ -171,4 +171,4 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
     }
     if log_results:
         log_run_results(results)
-    return pred, true
+    return results

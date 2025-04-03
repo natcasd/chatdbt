@@ -218,4 +218,4 @@ if __name__ == "__main__":
     # test_negative_generations()
     # testing_for_variability()
     # generate_dataset_2('datasets/patient_records2.json')
-    generate_nl_query('datasets/patient_records2.json', 'datasets/patient_records2_nl_query.json')
+    generate_nl_query('patient_records2.json', 'patient_records2_nl_query.json')
