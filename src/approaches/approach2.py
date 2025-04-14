@@ -7,8 +7,11 @@ from metrics.metrics import accuracy, precision, recall, f1_score
 from transitions import Machine
 
 class PatternFSM:
-    def __init__(self, pattern):
+    def __init__(self, pattern, order_sensitive=None):
+        if order_sensitive is None:
+            order_sensitive = input("Should the pattern matching be order-sensitive? (yes/no): ").strip().lower() == "yes"
         self.pattern = pattern
+        self.order_sensitive = order_sensitive
         self.states = ["START", "EXTRACTING", "ACCEPTED", "REJECTED"]
         self.machine = Machine(model=self, states=self.states, initial="START")
 
@@ -28,9 +31,18 @@ class PatternFSM:
         found_all = set(required_symbols).issubset(set(extracted_symbols))
 
         if found_all:
-            self.accept()
-            if verbose:
-                print("FSM Result: All required symbols found.")
+            if self.order_sensitive:
+                if required_symbols == extracted_symbols:
+                    self.accept()
+                    if verbose:
+                        print("FSM Result: All required symbols found. Correct order.")
+                else:
+                    self.reject()
+                    print("FSM Result: All required symbols found. Incorrect order.")
+            else:   
+                self.accept()
+                if verbose:
+                    print("FSM Result: All required symbols found.")
             
             return True
         else:
@@ -40,25 +52,13 @@ class PatternFSM:
                 print(f"FSM Result: Some required symbols are missing: {missing}")
            
             return False
-    # def extract_symbols(self, record_text, semantic_symbols):
-    #     found_symbols = set()
-
-    #     for symbol in semantic_symbols:
-    #         pattern = re.escape(symbol)  
-    #         match = re.search(pattern, record_text, re.IGNORECASE)
-            
-    #         if match:
-    #             found_symbols.add(symbol)
-    #             self.found_symbol()  
-        
-    #     return set(semantic_symbols).issubset(found_symbols)
 
 # want this to return true if pattern exists, false otherwise
 # response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
 def pattern_identification(extracted_symbols, regex, verbose=False):
     fsm = PatternFSM(regex)
     # Extract just the symbols from the tuples for pattern matching
-    symbols_only = [symbol for symbol, _ in extracted_symbols]
+    symbols_only = [symbol for symbol in extracted_symbols]
     return fsm.match(symbols_only, regex, verbose)
 
 def parse_model_output(model_output):
@@ -133,8 +133,10 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
         
         if verbose:
             print(f"\nExtracted Symbols List:")
-            for symbol, explanation in extracted_symbols:
-                print(f"  - {symbol}: {explanation}")
+            #for symbol, explanation in extracted_symbols:
+                #print(f"  - {symbol}: {explanation}")
+            for item in extracted_symbols:
+                print(f" - {item}")
         
         response_bool = pattern_identification(extracted_symbols, regex, verbose)
         pred.append(response_bool)
