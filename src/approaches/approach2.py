@@ -8,8 +8,6 @@ from transitions import Machine
 
 class PatternFSM:
     def __init__(self, pattern, order_sensitive=None):
-        if order_sensitive is None:
-            order_sensitive = input("Should the pattern matching be order-sensitive? (yes/no): ").strip().lower() == "yes"
         self.pattern = pattern
         self.order_sensitive = order_sensitive
         self.states = ["START", "EXTRACTING", "ACCEPTED", "REJECTED"]
@@ -21,12 +19,12 @@ class PatternFSM:
         self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
         self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
 
-    def match(self, extracted_symbols, semantic_symbols, verbose=False):
+    def match(self, extracted_symbols, semantic_symbols, verbose):
         """ Checks if all required semantic symbols are found in the given text. """
         self.start_extraction() 
 
         # Extract semantic symbols from the pattern string (e.g., "<sym1><sym2>")
-        required_symbols = re.findall(r"<(.*?)>", semantic_symbols)
+        required_symbols = re.findall(r"(<.*?>)", semantic_symbols)
 
         found_all = set(required_symbols).issubset(set(extracted_symbols))
 
@@ -36,15 +34,16 @@ class PatternFSM:
                     self.accept()
                     if verbose:
                         print("FSM Result: All required symbols found. Correct order.")
+                    return True
                 else:
                     self.reject()
                     print("FSM Result: All required symbols found. Incorrect order.")
+                    return False
             else:   
                 self.accept()
                 if verbose:
                     print("FSM Result: All required symbols found.")
-            
-            return True
+                return True
         else:
             self.reject()
             missing = set(required_symbols) - set(extracted_symbols)
@@ -54,11 +53,11 @@ class PatternFSM:
             return False
 
 # want this to return true if pattern exists, false otherwise
-# response_dict is a dictionary of <symbol>: extracted text pairs, can adjust what this looks like if needed
-def pattern_identification(extracted_symbols, regex, verbose=False):
-    fsm = PatternFSM(regex)
+# extracted_symbols is a list of tuples of (<symbol>: explanation), can adjust what this looks like if needed
+def pattern_identification(extracted_symbols, regex, order_sensitive, verbose):
+    fsm = PatternFSM(regex, order_sensitive)
     # Extract just the symbols from the tuples for pattern matching
-    symbols_only = [symbol for symbol in extracted_symbols]
+    symbols_only = [symbol for symbol, _ in extracted_symbols]
     return fsm.match(symbols_only, regex, verbose)
 
 def parse_model_output(model_output):
@@ -87,7 +86,7 @@ def parse_model_output(model_output):
         response_list = []
     return response_list
 
-def approach2(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False):
+def approach2(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False, order_sensitive=False):
     pred = []
     true = []
 
@@ -122,23 +121,22 @@ def approach2(records, model_client, dataset_name="not defined", log_results=Fal
             prompt = """
             Given the following patient record, extract the following semantic symbols if they exist: {regex}. 
             Return a machine parseable python list of tuples, where each tuple is (<semantic_symbol>, explanation) in the order they appear in the patient record. 
-            IMPORTANT: Only return the list, nothing else. If a semantic symbol is not clearly represented in the patient record, do not include it in the list.
+            IMPORTANT: Only return the list, nothing else. If a semantic symbol is not represented in the patient record, do not include it in the list.
             Make sure the order of the list reflects the order in which the semantic symbols appear in the patient record, not the order in which they are listed in the regex.
             The explanation should be a brief description of where/how the symbol appears in the text.
             \n\nPatient Record: {record_text}
             """
         
         response = model_client.generate(prompt, system_prompt=system_prompt)
+        print(f'response: {response}')
         extracted_symbols = parse_model_output(response)
-        
+
         if verbose:
             print(f"\nExtracted Symbols List:")
-            #for symbol, explanation in extracted_symbols:
-                #print(f"  - {symbol}: {explanation}")
-            for item in extracted_symbols:
-                print(f" - {item}")
+            for symbol, explanation in extracted_symbols:
+                print(f"  - {symbol}: {explanation}")
         
-        response_bool = pattern_identification(extracted_symbols, regex, verbose)
+        response_bool = pattern_identification(extracted_symbols, regex, order_sensitive, verbose)
         pred.append(response_bool)
         true.append(label)
         
