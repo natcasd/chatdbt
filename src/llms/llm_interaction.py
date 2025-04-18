@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-
+from google.genai import types
 # Load environment variables from .env file
 load_dotenv()
 
@@ -298,4 +298,92 @@ class GroqClient:
                 
         except Exception as e:
             print(f"Error generating text with Groq: {str(e)}")
+            return f"Error: {str(e)}"
+
+
+class GeminiClient:
+    """
+    Class for interacting with Google's Gemini language models.
+    """
+    def __init__(
+        self, 
+        model: str = "gemini-2.0-flash-001", 
+        temperature: float = 0.7
+    ):
+        """
+        Initialize a Gemini LLM client.
+        
+        Args:
+            model: The specific Gemini model to use (default: gemini-pro)
+            temperature: Temperature for generation (higher = more creative)
+        """
+        self.model = model
+        self.temperature = temperature
+        self.provider = "gemini"
+        
+        # Get API key from environment
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY not found in environment variables")
+        
+        # Initialize Gemini client
+        try:
+            from google import genai
+            self.client = genai.Client(api_key=api_key)
+            print(f"Gemini client initialized with model: {model}")
+        except ImportError:
+            raise ImportError("Google Generative AI package not installed. Run 'pip install google-generativeai' to use Gemini models.")
+    
+    def list_models(self):
+        """
+        Fetch and display all available models from Gemini API.
+        """
+        try:
+            models = self.client.models.list()
+            gemini_models = [model.name for model in models if "gemini" in model.name]
+            
+            print("\n" + "="*50)
+            print(f"AVAILABLE GEMINI MODELS ({len(gemini_models)} total)")
+            print("="*50)
+            
+            print("\nGemini Models:")
+            for model in gemini_models:
+                current = " (currently selected)" if model == self.model else ""
+                print(f"  - {model}{current}")
+            
+            print("\n")
+        except Exception as e:
+            print(f"Error listing Gemini models: {str(e)}")
+            print("\n")
+    
+    def generate(self, prompt: str, max_tokens: int = 500, system_prompt: str = None, **kwargs) -> str:
+        """
+        Generate text using Gemini API.
+        
+        Args:
+            prompt: The input prompt
+            max_tokens: Maximum number of tokens to generate
+            system_prompt: Optional system prompt to guide the model's behavior
+            **kwargs: Additional parameters to pass to the API
+            
+        Returns:
+            Generated text response
+        """
+        try:
+            # Combine system prompt and user prompt if system prompt exists
+            contents = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=max_tokens,
+                    **kwargs
+    ),
+            )
+            
+            return response.text.strip()
+                
+        except Exception as e:
+            print(f"Error generating text with Gemini: {str(e)}")
             return f"Error: {str(e)}"
