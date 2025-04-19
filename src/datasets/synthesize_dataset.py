@@ -1,6 +1,6 @@
 import json
 import random
-from llm_interaction import OpenAIClient, GroqClient, AnthropicClient
+from llms.llm_interaction import OpenAIClient, GroqClient, AnthropicClient
 from tqdm import tqdm
 
 def load_s_regexes(json_file):
@@ -249,8 +249,6 @@ def generate_semantic_symbol_vocab():
 
         Important: Only return the semantic regex. No markdown, no explanation.
         """
-
-
 
         response = llm.generate(system_prompt=system_prompt, prompt=user_prompt, max_tokens=100)
         print(response)
