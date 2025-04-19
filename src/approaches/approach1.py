@@ -6,7 +6,7 @@ from tqdm import tqdm
 def approach1(records, model_client, dataset_name="not defined", log_results=False, prompt_template=None, system_prompt=None, verbose=False):
     pred = []
     true = []
-    
+    responses = []
     start_time = time.time()
 
     if system_prompt is None:
@@ -29,8 +29,12 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
             prompt = prompt_template.format(regex=regex, record_text=record_text)
         else:
             prompt = f"Given the following patient record, identify if it matches the following semantic regex pattern: {regex} Return either true OR false, nothing else.\n\nPatient Record: {record_text}"
-        response = model_client.generate(prompt, system_prompt=system_prompt)
-        response_bool = response.strip().lower() == "true"
+        response = model_client.generate(prompt=prompt, system_prompt=system_prompt)
+        if isinstance(response, str):
+            response_bool = response.strip().lower() == "true"
+        else:
+            response_bool = response
+        responses.append(response)
         pred.append(response_bool)
         true.append(label)
         
@@ -64,7 +68,8 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
         'f1': f1,
         'time_elapsed': end_time - start_time,
         'model': model_client.model,
-        'provider': model_client.provider
+        'provider': model_client.provider,
+        'responses': responses 
     }
     if log_results:
         log_run_results(results)
