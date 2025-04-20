@@ -78,7 +78,7 @@ def approach1(records, model_client, dataset_name="not defined", log_results=Fal
 def approach1_naive(records, model_client, dataset_name="not defined", log_results=False, prompt_template=None, system_prompt=None, verbose=False):
     pred = []
     true = []
-    
+    responses = []
     start_time = time.time()
 
     if system_prompt is None:
@@ -102,7 +102,11 @@ def approach1_naive(records, model_client, dataset_name="not defined", log_resul
         else:
             prompt = f"Given the following patient record, answer the following natural language query: {nl_query} Return either true OR false, nothing else.\n\nPatient Record: {record_text}"
         response = model_client.generate(prompt, system_prompt=system_prompt)
-        response_bool = response.strip().lower() == "true"
+        if isinstance(response, str):
+            response_bool = response.strip().lower() == "true"
+        else:
+            response_bool = response
+        responses.append(response)
         pred.append(response_bool)
         true.append(label)
         
@@ -136,7 +140,8 @@ def approach1_naive(records, model_client, dataset_name="not defined", log_resul
         'f1': f1,
         'time_elapsed': end_time - start_time,
         'model': model_client.model,
-        'provider': model_client.provider
+        'provider': model_client.provider,
+        'responses': responses
     }
     if log_results:
         log_run_results(results)
