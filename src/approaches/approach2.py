@@ -8,7 +8,17 @@ from approaches.helper_methods import extract_list_from_model_output, extract_sy
 
 class PatternFSM:
     def __init__(self, pattern, order_sensitivity=None):
-        ######## Non-native FSM implementation ########
+        # self.pattern = pattern
+        # self.order_sensitive = order_sensitive
+        # self.states = ["START", "EXTRACTING", "ACCEPTED", "REJECTED"]
+        # self.machine = Machine(model=self, states=self.states, initial="START")
+
+        # # Define transitions
+        # self.machine.add_transition(trigger="start_extraction", source="START", dest="EXTRACTING")
+        # self.machine.add_transition(trigger="found_symbol", source="EXTRACTING", dest="EXTRACTING")
+        # self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
+        # self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
+         ######## Non-native FSM implementation ########
         # Extract required semantic symbols from something like "<A><B><C>"
         self.symbol_sequence = re.findall(r"<(.*?)>", pattern)
         self.state_names = [f"STATE_{i}" for i in range(len(self.symbol_sequence) + 1)]
@@ -69,6 +79,7 @@ class PatternFSM:
 # want this to return true if pattern exists, false otherwise
 # extracted_symbols is a list of tuples of (<symbol>: explanation), can adjust what this looks like if needed
 def pattern_identification(extracted_symbols, regex, order_sensitivity, verbose):
+    # making it so its case insensitive
     extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in extracted_symbols]
     regex = regex.lower()
     fsm = PatternFSM(regex, order_sensitive=order_sensitivity)
