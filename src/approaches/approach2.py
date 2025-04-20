@@ -7,58 +7,94 @@ from transitions import Machine
 from approaches.helper_methods import extract_list_from_model_output, extract_symbols_from_annotated_record
 
 class PatternFSM:
-    def __init__(self, pattern, order_sensitive=None):
-        self.pattern = pattern
-        self.order_sensitive = order_sensitive
-        self.states = ["START", "EXTRACTING", "ACCEPTED", "REJECTED"]
-        self.machine = Machine(model=self, states=self.states, initial="START")
+    def __init__(self, pattern, order_sensitivity=None):
+        # self.pattern = pattern
+        # self.order_sensitive = order_sensitive
+        # self.states = ["START", "EXTRACTING", "ACCEPTED", "REJECTED"]
+        # self.machine = Machine(model=self, states=self.states, initial="START")
 
-        # Define transitions
-        self.machine.add_transition(trigger="start_extraction", source="START", dest="EXTRACTING")
-        self.machine.add_transition(trigger="found_symbol", source="EXTRACTING", dest="EXTRACTING")
-        self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
-        self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
+        # # Define transitions
+        # self.machine.add_transition(trigger="start_extraction", source="START", dest="EXTRACTING")
+        # self.machine.add_transition(trigger="found_symbol", source="EXTRACTING", dest="EXTRACTING")
+        # self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
+        # self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
+         ######## Non-native FSM implementation ########
+        # Extract required semantic symbols from something like "<A><B><C>"
+        self.symbol_sequence = re.findall(r"<(.*?)>", pattern)
+        self.state_names = [f"STATE_{i}" for i in range(len(self.symbol_sequence) + 1)]
 
-    def match(self, extracted_symbols, semantic_symbols, verbose):
-        """ Checks if all required semantic symbols are found in the given text. """
-        self.start_extraction() 
+        # Create machine with states from STATE_0 to STATE_n (accepting)
+        self.machine = Machine(model=self, states=self.state_names, initial=self.state_names[0])
 
-        # Extract semantic symbols from the pattern string (e.g., "<sym1><sym2>")
-        required_symbols = re.findall(r"<(.*?)>", semantic_symbols)
+        # Add transitions for each expected symbol: STATE_i --symbol--> STATE_{i+1}
+        for i, symbol in enumerate(self.symbol_sequence):
+            self.machine.add_transition(trigger=symbol, source=self.state_names[i], dest=self.state_names[i + 1])
 
-        found_all = set(required_symbols).issubset(set(extracted_symbols))
+        self.final_state = self.state_names[-1]
 
-        if found_all:
-            if self.order_sensitive:
-                if required_symbols == extracted_symbols:
-                    self.accept()
-                    if verbose:
-                        print("FSM Result: All required symbols found. Correct order.")
-                    return True
-                else:
-                    self.reject()
-                    print("FSM Result: All required symbols found. Incorrect order.")
-                    return False
-            else:   
-                self.accept()
-                if verbose:
-                    print("FSM Result: All required symbols found.")
-                return True
-        else:
-            self.reject()
-            missing = set(required_symbols) - set(extracted_symbols)
-            if verbose:
-                print(f"FSM Result: Some required symbols are missing: {missing}")
-           
-            return False
+    def set_match(self, extracted_symbols, semantic_symbols, verbose):
+        """
+        Checks if all required semantic symbols (from the semantic_pattern) are present
+        in the extracted symbols, regardless of order.
+        """
+        # Extract symbol names from pattern like "<A><B><C>" → ['A', 'B', 'C']
+        required_symbols = set(re.findall(r"<(.*?)>", semantic_pattern))
+
+        # Pull just the symbol names from extracted tuples and clean them
+        extracted_symbols = set(symbol.strip("<>") for symbol, _ in extracted_symbol_tuples)
+
+        if verbose:
+            print(f"Required symbols: {required_symbols}")
+            print(f"Extracted symbols: {extracted_symbols}")
+
+        return required_symbols.issubset(extracted_symbols)
+
+    def fsm_match(self, extracted_symbols, semantic_symbols, verbose):
+        expected_index = 0  # track which symbol we're looking for next
+
+        # Extract only the first element of each tuple for symbol matching
+        flattened_symbols = [symbol.strip("<>") for symbol, _ in extracted_symbols]
+
+        if verbose:
+            print(f"Required sequence: {self.symbol_sequence}")
+            print(f"Extracted sequence: {flattened_symbols}\n")
+
+        for symbol in flattened_symbols:
+            if expected_index < len(self.symbol_sequence):
+                expected_symbol = self.symbol_sequence[expected_index]
+                if symbol == expected_symbol:
+                    # Perform the transition using symbol name as trigger
+                    if hasattr(self, symbol):
+                        getattr(self, symbol)()
+                        expected_index += 1
+                        if verbose:
+                            print(f"Matched '{symbol}' → transitioned to {self.state}")
+
+        accepted = self.state == self.final_state
+        if verbose:
+            print(f"\nFinal state: {self.state} → {'ACCEPTED' if accepted else 'REJECTED'}")
+
+        return accepted
+        
 
 # want this to return true if pattern exists, false otherwise
 # extracted_symbols is a list of tuples of (<symbol>: explanation), can adjust what this looks like if needed
-def pattern_identification(extracted_symbols, regex, order_sensitive, verbose):
-    fsm = PatternFSM(regex, order_sensitive)
-    # Extract just the symbols from the tuples for pattern matching
-    symbols_only = [symbol for symbol, _ in extracted_symbols]
-    return fsm.match(symbols_only, regex, verbose)
+def pattern_identification(extracted_symbols, regex, order_sensitivity, verbose):
+    fsm = PatternFSM(regex, order_sensitive=order_sensitivity)
+
+    if order_sensitivity:
+        # Order-sensitive FSM match (e.g., requires A→B→C)
+        return fsm.fsm_match(extracted_symbols, regex, verbose)
+    else:
+        # Order-insensitive: just check if all required symbols are present
+        symbols_only = [symbol.strip("<>") for symbol, _ in extracted_symbols]
+        required_symbols = set(re.findall(r"<(.*?)>", regex))
+
+        if verbose:
+            print(f"Required symbols (unordered): {required_symbols}")
+            print(f"Extracted symbols: {symbols_only}")
+
+        return required_symbols.issubset(set(symbols_only))
 
 def approach2_base(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False, order_sensitive=False):
     pred = []
@@ -280,4 +316,3 @@ def approach2_annotate(records, model_client, dataset_name="not defined", log_re
     if log_results:
         log_run_results(results)
     return results
-
