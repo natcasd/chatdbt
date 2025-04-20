@@ -80,6 +80,8 @@ class PatternFSM:
 # want this to return true if pattern exists, false otherwise
 # extracted_symbols is a list of tuples of (<symbol>: explanation), can adjust what this looks like if needed
 def pattern_identification(extracted_symbols, regex, order_sensitivity, verbose):
+    extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in extracted_symbols]
+    regex = regex.lower()
     fsm = PatternFSM(regex, order_sensitive=order_sensitivity)
 
     if order_sensitivity:
