@@ -25,6 +25,7 @@ class PatternFSM:
 
         # Extract semantic symbols from the pattern string (e.g., "<sym1><sym2>")
         required_symbols = re.findall(r"<(.*?)>", semantic_symbols)
+        
 
         found_all = set(required_symbols).issubset(set(extracted_symbols))
 
@@ -57,8 +58,8 @@ class PatternFSM:
 def pattern_identification(extracted_symbols, regex, order_sensitive, verbose):
     fsm = PatternFSM(regex, order_sensitive)
     # Extract just the symbols from the tuples for pattern matching
-    symbols_only = [symbol for symbol, _ in extracted_symbols]
-    return fsm.match(symbols_only, regex, verbose)
+    symbols_only = [symbol.lower() for symbol, _ in extracted_symbols]
+    return fsm.match(symbols_only, regex.lower(), verbose)
 
 def approach2_base(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False, order_sensitive=False):
     pred = []
@@ -69,7 +70,7 @@ def approach2_base(records, model_client, dataset_name="not defined", log_result
     if system_prompt is None:
 
         system_prompt = """
-        You are a helpful AI assistant that strictly outputs a python list of tuples, where each tuple is (semantic_symbol, explanation) in the order they appear in the patient record.
+        You are a helpful AI assistant that strictly outputs a python list of tuples, where each tuple is ("semantic_symbol", "explanation") in the order they appear in the patient record.
         The output should be parseable with ast.literal_eval().
         """
     # Use tqdm only when not in verbose mode
@@ -94,7 +95,7 @@ def approach2_base(records, model_client, dataset_name="not defined", log_result
         else:
             prompt = """
             Given the following patient record, extract the following semantic symbols if they exist: {regex}. 
-            Return a machine parseable python list of tuples, where each tuple is (semantic_symbol, explanation) in the order they appear in the patient record. Only include semantic symbols that are explicitly represented in the patient record, i.e. their explanation should be the actual text in which they appear. If they don't appear don't include them in the list. 
+            Return a machine parseable python list of tuples, where each tuple is ("semantic_symbol", "explanation") in the order they appear in the patient record. Only include semantic symbols that are explicitly represented in the patient record, i.e. their explanation should be the actual text in which they appear. If they don't appear don't include them in the list. 
             IMPORTANT: Only return the list, nothing else.
             The semantic symbols should just be the word not the <>
             Make sure the order of the list reflects the order in which the semantic symbols appear in the patient record, not the order in which they are listed in the regex.
@@ -226,6 +227,10 @@ def approach2_annotate(records, model_client, dataset_name="not defined", log_re
 
                 Tags may be nested. In such cases, include all relevant entries separately, even if they overlap.
 
+                If a "text" corresponding to a tag is longer that 50 words or a sentence, just return the first 50 words or sentence.
+
+                Do not generate code to extract the text. Just return the list of tuples.
+
                 Example:
                 Input: <patient>The <vaccine>flu vaccine</vaccine> was given.</patient>
                 Output: [("vaccine", "flu vaccine"), ("patient", "The flu vaccine was given.")]
@@ -235,7 +240,7 @@ def approach2_annotate(records, model_client, dataset_name="not defined", log_re
                 """
 
             extraction_prompt = extraction_prompt.format(annotated_record=annotated_record)
-            extracted_symbols = model_client.generate(extraction_prompt, max_tokens=450)
+            extracted_symbols = model_client.generate(extraction_prompt, max_tokens=750)
             extracted_symbols = extract_list_from_model_output(extracted_symbols)
 
         extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in extracted_symbols]
