@@ -112,9 +112,10 @@ def approach1_naive(records, model_client, dataset_name="not defined", log_resul
         
         if verbose:
             print("\n" + "="*80)
-            print(f"\nPatient Record: {record_text}")
-            print(f"Natural language query: {nl_query}")
-            print(f"Model prediction: {response_bool}, Actual: {label}")
+            print(f"\nPatient Record:\n{record_text}")
+            print(f"\nSemantic regex query:\n{record['s_regex']}")
+            print(f"\nNatural language query:\n{nl_query}")
+            print(f"\nModel prediction: {response_bool}, Actual: {label}")
             print("=" * 80)
 
     end_time = time.time()
