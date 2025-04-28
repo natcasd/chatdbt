@@ -7,18 +7,10 @@ from transitions import Machine
 from approaches.helper_methods import extract_list_from_model_output, extract_symbols_from_annotated_record
 
 class PatternFSM:
-    def __init__(self, pattern, order_sensitivity=None):
-        # self.pattern = pattern
-        # self.order_sensitive = order_sensitive
-        # self.states = ["START", "EXTRACTING", "ACCEPTED", "REJECTED"]
-        # self.machine = Machine(model=self, states=self.states, initial="START")
-
-        # # Define transitions
-        # self.machine.add_transition(trigger="start_extraction", source="START", dest="EXTRACTING")
-        # self.machine.add_transition(trigger="found_symbol", source="EXTRACTING", dest="EXTRACTING")
-        # self.machine.add_transition(trigger="accept", source="EXTRACTING", dest="ACCEPTED")
-        # self.machine.add_transition(trigger="reject", source="EXTRACTING", dest="REJECTED")
-         ######## Non-native FSM implementation ########
+    def __init__(self, pattern, order_sensitive=None):
+        self.pattern = pattern
+        self.order_sensitive = order_sensitive
+        
         # Extract required semantic symbols from something like "<A><B><C>"
         self.symbol_sequence = re.findall(r"<(.*?)>", pattern)
         self.state_names = [f"STATE_{i}" for i in range(len(self.symbol_sequence) + 1)]
@@ -32,23 +24,7 @@ class PatternFSM:
 
         self.final_state = self.state_names[-1]
 
-    def set_match(self, extracted_symbols, semantic_symbols, verbose):
-        """
-        Checks if all required semantic symbols (from the semantic_pattern) are present
-        in the extracted symbols, regardless of order.
-        """
-        # Extract symbol names from pattern like "<A><B><C>" → ['A', 'B', 'C']
-        required_symbols = set(re.findall(r"<(.*?)>", semantic_pattern))
-
-        # Pull just the symbol names from extracted tuples and clean them
-        extracted_symbols = set(symbol.strip("<>") for symbol, _ in extracted_symbol_tuples)
-
-        if verbose:
-            print(f"Required symbols: {required_symbols}")
-            print(f"Extracted symbols: {extracted_symbols}")
-
-        return required_symbols.issubset(extracted_symbols)
-
+    # Define the FSM transition function, if a match is found, it will transition to the next state
     def fsm_match(self, extracted_symbols, semantic_symbols, verbose):
         expected_index = 0  # track which symbol we're looking for next
 
@@ -75,20 +51,18 @@ class PatternFSM:
             print(f"\nFinal state: {self.state} → {'ACCEPTED' if accepted else 'REJECTED'}")
 
         return accepted
+        
 
 # want this to return true if pattern exists, false otherwise
 # extracted_symbols is a list of tuples of (<symbol>: explanation), can adjust what this looks like if needed
-def pattern_identification(extracted_symbols, regex, order_sensitivity, verbose):
-    # making it so its case insensitive
-    extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in extracted_symbols]
-    regex = regex.lower()
-    fsm = PatternFSM(regex, order_sensitive=order_sensitivity)
+def pattern_identification(extracted_symbols, regex, order_sensitive, verbose):
+    fsm = PatternFSM(regex, order_sensitive=order_sensitive)
 
-    if order_sensitivity:
+    if order_sensitive:
         # Order-sensitive FSM match (e.g., requires A→B→C)
         return fsm.fsm_match(extracted_symbols, regex, verbose)
     else:
-        # Order-insensitive: just check if all required symbols are present
+        # Order-insensitive: just check if all required symbols are present using a set
         symbols_only = [symbol.strip("<>") for symbol, _ in extracted_symbols]
         required_symbols = set(re.findall(r"<(.*?)>", regex))
 
@@ -98,7 +72,113 @@ def pattern_identification(extracted_symbols, regex, order_sensitivity, verbose)
 
         return required_symbols.issubset(set(symbols_only))
 
-def approach2_base(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False, order_sensitive=False):
+
+# splitting the input into units for processing
+def split_record_into_units(record_text, paragraphs_per_unit=3):
+    """
+    Splits a medical record into streaming units.
+    Priority:
+        1. Split by section headers (all caps lines like 'HISTORY OF PRESENT ILLNESS').
+        2. Fallback to clustering paragraphs (default 3 paragraphs per unit).
+
+    Args:
+        record_text (str): The full medical record text.
+        paragraphs_per_unit (int): Number of paragraphs to cluster when falling back.
+
+    Returns:
+        list of str: List of streaming units.
+    """
+    units = []
+
+    # Attempt to split by SECTION HEADERS
+    section_pattern = r"(?<=\n)([A-Z\s]{3,50})(?=\n)"
+    matches = list(re.finditer(section_pattern, record_text))
+
+    if matches:
+        # Section headers detected
+        starts = [match.start() for match in matches]
+        starts.append(len(record_text))  # add end of record for slicing last section
+
+        for i in range(len(matches)):
+            start = starts[i]
+            end = starts[i+1]
+            section_text = record_text[start:end].strip()
+            if section_text:
+                units.append(section_text)
+
+    else:
+        # Fallback: Split into paragraphs
+        paragraphs = [p.strip() for p in record_text.split("\n\n") if p.strip()]
+        
+        for i in range(0, len(paragraphs), paragraphs_per_unit):
+            group = paragraphs[i:i+paragraphs_per_unit]
+            unit_text = "\n\n".join(group)
+            units.append(unit_text)
+
+    return units
+
+
+# Define a function to process the record in streaming units, calls LLM per unit and use fsm to check if match is found, and immediately halts if match is found
+def streaming_unit_processing(record_text, regex, model_client, system_prompt, order_sensitive, verbose=False):
+    """
+    Processes a medical record in streaming units (sections first, fallback to paragraph clusters).
+    Calls LLM per unit, accumulates extracted symbols, and halts immediately if match is found.
+
+    Args:
+        record_text (str): Full medical record text.
+        regex (str): Semantic pattern to match (e.g., "<patient><diagnosis>").
+        model_client: LLM client instance for generation.
+        system_prompt (str): System prompt for LLM extraction.
+        order_sensitive (bool): Whether matching requires correct order (FSM) or not.
+        verbose (bool): Whether to print detailed logs.
+
+    Returns:
+        (bool, list): (matched, extracted_symbols_so_far)
+    """
+    accumulated_extracted_symbols = []
+    units = split_record_into_units(record_text)
+
+    for unit_number, unit_text in enumerate(units, start=1):
+        if verbose:
+            print(f"\nStreaming Unit {unit_number}:")
+            print(unit_text)
+            print("-" * 80)
+
+        # Build the LLM prompt for this unit
+        prompt = f"""
+        Given the following medical text, extract the following semantic symbols if they exist: {regex}. 
+        Return a machine-parseable Python list of tuples, where each tuple is (semantic_symbol, explanation).
+        Only include symbols that are explicitly represented in the text.
+        IMPORTANT: Only return the list, nothing else.
+
+        Text:
+        {unit_text}
+        """
+
+        # Call LLM
+        response = model_client.generate(prompt, system_prompt=system_prompt)
+        unit_extracted_symbols = extract_list_from_model_output(response)
+
+        # Normalize symbols (if necessary, e.g., lowercase)
+        unit_extracted_symbols = [(symbol.lower().strip("<>"), explanation) for symbol, explanation in unit_extracted_symbols]
+
+        # Accumulate extracted symbols
+        accumulated_extracted_symbols.extend(unit_extracted_symbols)
+
+        # Pattern matching check
+        match_found = pattern_identification(accumulated_extracted_symbols, regex, order_sensitive, verbose)
+
+        if match_found:
+            if verbose:
+                print(f"\n✅ Match found at streaming unit {unit_number}!")
+            return True, accumulated_extracted_symbols
+
+    # No match after processing all units
+    if verbose:
+        print("\n❌ No match found after streaming all units.")
+    return False, accumulated_extracted_symbols
+
+def approach2_base(records, model_client, dataset_name="not defined", log_results=False, extraction_prompt_template=None, system_prompt=None, verbose=False, order_sensitive=False, streaming=False):
     pred = []
     true = []
 
@@ -107,7 +187,7 @@ def approach2_base(records, model_client, dataset_name="not defined", log_result
     if system_prompt is None:
 
         system_prompt = """
-        You are a helpful AI assistant that strictly outputs a python list of tuples, where each tuple is ("semantic_symbol", "explanation") in the order they appear in the patient record.
+        You are a helpful AI assistant that strictly outputs a python list of tuples, where each tuple is (semantic_symbol, explanation) in the order they appear in the patient record.
         The output should be parseable with ast.literal_eval().
         """
     # Use tqdm only when not in verbose mode
@@ -132,7 +212,7 @@ def approach2_base(records, model_client, dataset_name="not defined", log_result
         else:
             prompt = """
             Given the following patient record, extract the following semantic symbols if they exist: {regex}. 
-            Return a machine parseable python list of tuples, where each tuple is ("semantic_symbol", "explanation") in the order they appear in the patient record. Only include semantic symbols that are explicitly represented in the patient record, i.e. their explanation should be the actual text in which they appear. If they don't appear don't include them in the list. 
+            Return a machine parseable python list of tuples, where each tuple is (semantic_symbol, explanation) in the order they appear in the patient record. Only include semantic symbols that are explicitly represented in the patient record, i.e. their explanation should be the actual text in which they appear. If they don't appear don't include them in the list. 
             IMPORTANT: Only return the list, nothing else.
             The semantic symbols should just be the word not the <>
             Make sure the order of the list reflects the order in which the semantic symbols appear in the patient record, not the order in which they are listed in the regex.
@@ -140,24 +220,43 @@ def approach2_base(records, model_client, dataset_name="not defined", log_result
             \n\nPatient Record: {record_text}
             """
 
-        prompt = prompt.format(regex=regex, record_text=record_text)
-        response = model_client.generate(prompt, system_prompt=system_prompt)
-        extracted_symbols = extract_list_from_model_output(response)
+        # If streaming is enabled, process the record in units
+        if streaming:
+            response_bool, extracted_symbols = streaming_unit_processing(
+                record_text,
+                regex,
+                model_client,
+                system_prompt,
+                order_sensitive,
+                verbose
+            )
+            pred.append(response_bool)
+            true.append(label)
+        else:
+            # Batch processing
+            prompt = prompt.format(regex=regex, record_text=record_text)
+            response = model_client.generate(prompt, system_prompt=system_prompt)
+            extracted_symbols = extract_list_from_model_output(response)
 
-        if verbose:
-            print(f"\nExtracted Symbols List:")
-            for symbol, explanation in extracted_symbols:
-                print(f"  - {symbol}: {explanation}")
-        
-        response_bool = pattern_identification(extracted_symbols, regex, order_sensitive, verbose)
-        pred.append(response_bool)
-        true.append(label)
+            if verbose:
+                print(f"\nExtracted Symbols List:")
+                for symbol, explanation in extracted_symbols:
+                    print(f"  - {symbol}: {explanation}")
+            
+            response_bool = pattern_identification(extracted_symbols, regex, order_sensitive, verbose)
+            pred.append(response_bool)
+            true.append(label)
         
         if verbose:
             print(f"Model prediction: {response_bool}, Actual: {label}")
             print("="*80)
 
     end_time = time.time()
+
+    print("\nDebuggggg")
+
+    print("\nFinal Predictions (pred):", pred)
+    print("\nGround Truth Labels (true):", true)
 
     acc = accuracy(pred, true)
     prec = precision(pred, true)
@@ -186,7 +285,7 @@ def approach2_base(records, model_client, dataset_name="not defined", log_result
         log_run_results(results)
     return results
 
-def approach2_annotate(records, model_client, dataset_name="not defined", log_results=False, annotation_prompt_template=None, extraction_prompt_template=None, system_prompt=None, manual_extraction=True, verbose=False, order_sensitive=False):
+def approach2_annotate(records, model_client, dataset_name="not defined", log_results=False, annotation_prompt_template=None, extraction_prompt_template=None, system_prompt=None, manual_extraction=True, verbose=False, order_sensitive=False, streaming=False):
     pred = []
     true = []
 
@@ -245,57 +344,119 @@ def approach2_annotate(records, model_client, dataset_name="not defined", log_re
             Output:
             Return only the fully annotated patient record as a single continuous string.
             """
-        annotated_prompt = annotation_prompt.format(regex=regex, record_text=record_text)
-        annotated_record = model_client.generate(annotated_prompt, system_prompt=system_prompt,  max_tokens=1500)
-        if verbose:
-            print(f"\nAnnotated Record:")
-            print(annotated_record)
         
-        if manual_extraction:
-            extracted_symbols = extract_symbols_from_annotated_record(annotated_record)
+        # If streaming is enabled, process the record in units
+        if streaming:
+            # STREAMING UNIT PROCESSING
+            extracted_symbols = []
+            units = split_record_into_units(record_text)
+
+            for unit_number, unit_text in enumerate(units, start=1):
+                if verbose:
+                    print(f"\nStreaming Unit {unit_number}:")
+                    print(unit_text)
+                    print("-" * 80)
+
+                # Annotate this unit
+                unit_annotation_prompt = annotation_prompt.format(regex=regex, record_text=unit_text)
+                annotated_unit = model_client.generate(unit_annotation_prompt, system_prompt=system_prompt, max_tokens=1000)
+
+                # Extract symbols from annotated unit
+                if manual_extraction:
+                    unit_extracted_symbols = extract_symbols_from_annotated_record(annotated_unit)
+                else:
+                    if extraction_prompt_template:
+                        extraction_prompt = extraction_prompt_template
+                    else:
+                        extraction_prompt = """
+                        Extract all text enclosed in semantic tags from the annotated medical record below. 
+
+                        Return only the extracted content as a valid Python list of tuples in the format: [("tag", "text"), ...].
+
+                        Tags may be nested. In such cases, include all relevant entries separately, even if they overlap.
+
+                        Example:
+                        Input: <patient>The <vaccine>flu vaccine</vaccine> was given.</patient>
+                        Output: [("vaccine", "flu vaccine"), ("patient", "The flu vaccine was given.")]
+
+                        Annotated Medical Record:
+                        {annotated_record}
+                        """
+
+                    extraction_unit_prompt = extraction_prompt.format(annotated_record=annotated_unit)
+                    extracted_text = model_client.generate(extraction_unit_prompt, max_tokens=450)
+                    unit_extracted_symbols = extract_list_from_model_output(extracted_text)
+
+                unit_extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in unit_extracted_symbols]
+
+                # Accumulate
+                extracted_symbols.extend(unit_extracted_symbols)
+
+                # Check for match immediately
+                response_bool = pattern_identification(extracted_symbols, regex, order_sensitive, verbose)
+
+                if response_bool:
+                    if verbose:
+                        print(f"\n✅ Match found at streaming unit {unit_number}!")
+                    break  # early stop after match
+            pred.append(response_bool)
+            true.append(label)
         else:
-            if extraction_prompt_template:
-                extraction_prompt = extraction_prompt_template
+            # BATCH PROCESSING
+            # Annotate the entire record
+            annotated_prompt = annotation_prompt.format(regex=regex, record_text=record_text)
+            annotated_record = model_client.generate(annotated_prompt, system_prompt=system_prompt,  max_tokens=1500)
+            if verbose:
+                print(f"\nAnnotated Record:")
+                print(annotated_record)
+            
+            if manual_extraction:
+                extracted_symbols = extract_symbols_from_annotated_record(annotated_record)
             else:
-                extraction_prompt = """
-                Extract all text enclosed in semantic tags from the annotated medical record below. 
+                if extraction_prompt_template:
+                    extraction_prompt = extraction_prompt_template
+                else:
+                    extraction_prompt = """
+                    Extract all text enclosed in semantic tags from the annotated medical record below. 
 
-                Return only the extracted content as a valid Python list of tuples in the format: [("tag", "text"), ...].
+                    Return only the extracted content as a valid Python list of tuples in the format: [("tag", "text"), ...].
 
-                Tags may be nested. In such cases, include all relevant entries separately, even if they overlap.
+                    Tags may be nested. In such cases, include all relevant entries separately, even if they overlap.
 
-                If a "text" corresponding to a tag is longer that 50 words or a sentence, just return the first 50 words or sentence.
+                    Example:
+                    Input: <patient>The <vaccine>flu vaccine</vaccine> was given.</patient>
+                    Output: [("vaccine", "flu vaccine"), ("patient", "The flu vaccine was given.")]
 
-                Do not generate code to extract the text. Just return the list of tuples.
+                    Annotated Medical Record:
+                    {annotated_record}
+                    """
 
-                Example:
-                Input: <patient>The <vaccine>flu vaccine</vaccine> was given.</patient>
-                Output: [("vaccine", "flu vaccine"), ("patient", "The flu vaccine was given.")]
+                extraction_prompt = extraction_prompt.format(annotated_record=annotated_record)
+                extracted_symbols = model_client.generate(extraction_prompt, max_tokens=450)
+                extracted_symbols = extract_list_from_model_output(extracted_symbols)
 
-                Annotated Medical Record:
-                {annotated_record}
-                """
+            extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in extracted_symbols]
+            if verbose:
+                print(f"\nExtracted Symbols List:")
+                for symbol, explanation in extracted_symbols:
+                    print(f"  - {symbol}: {explanation}")
+            
+            response_bool = pattern_identification(extracted_symbols, regex, order_sensitive, verbose)
+            pred.append(response_bool)
+            true.append(label)
+            
+            if verbose:
+                print(f"Model prediction: {response_bool}, Actual: {label}")
+                print("="*80)
 
-            extraction_prompt = extraction_prompt.format(annotated_record=annotated_record)
-            extracted_symbols = model_client.generate(extraction_prompt, max_tokens=750)
-            extracted_symbols = extract_list_from_model_output(extracted_symbols)
-
-        extracted_symbols = [(symbol.lower(), explanation) for symbol, explanation in extracted_symbols]
-        if verbose:
-            print(f"\nExtracted Symbols List:")
-            for symbol, explanation in extracted_symbols:
-                print(f"  - {symbol}: {explanation}")
-        
-        response_bool = pattern_identification(extracted_symbols, regex, order_sensitive, verbose)
-        pred.append(response_bool)
-        true.append(label)
-        
-        if verbose:
-            print(f"Model prediction: {response_bool}, Actual: {label}")
-            print("="*80)
+            pred.append(response_bool)
+            true.append(label)
 
     end_time = time.time()
+    print("\nDebuggggg")
 
+    print("\nFinal Predictions (pred):", pred)
+    print("\nGround Truth Labels (true):", true)
     acc = accuracy(pred, true)
     prec = precision(pred, true)
     rec = recall(pred, true)
