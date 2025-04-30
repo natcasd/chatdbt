@@ -1,4 +1,4 @@
-# Data Management for AI - Final Project
+# Data Management for AI - Research Project
 
 This repository contains our final project for the Data Management for AI course. 
 
@@ -26,6 +26,3 @@ pip install -r requirements.txt
 
 By Nathan, Justin, Yandi, Noah
 
-## Course Information
-
-Data Management for AI - Spring 2024 
