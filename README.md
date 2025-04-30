@@ -1,6 +1,6 @@
 # Data Management for AI - Research Project
 
-This repository contains our final project for the Data Management for AI course. 
+This repository contains our research project for the Data Management for AI course. 
 
 ## Project Overview
 
