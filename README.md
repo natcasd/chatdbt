@@ -20,7 +20,7 @@ git clone https://github.com/natcasd/chatdbt.git
 ```bash
 pip install -r requirements.txt
 ```
-4. Sample code to run approaches is in test_approaches.ipynb
+4. Sample code to run approaches is in the notebooks in src/.
 
 ## Team Members
 
